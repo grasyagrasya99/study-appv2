@@ -22,8 +22,8 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 .word-card{background:white;margin:5px;padding:10px;border-radius:12px;box-shadow:0 2px 5px rgba(0,0,0,0.2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition: transform 0.3s ease, opacity 0.3s ease;}
 .word-card.selected{background:#58aaff;color:white;}
 .word-card.matched{background:#58cc02;color:white;}
-.word-card.matched.animate{transform: scale(0.8) rotate(20deg); opacity:0;}
-.word-card.wrong{background:#ff4d4d;color:white;}
+.word-card.matched.animate{transform: scale(0.5) rotate(20deg); opacity:0; transition: transform 0.5s ease, opacity 0.5s ease;}
+.word-card.wrong{background:#ff4d4d;color:white; animation: shake 0.5s;}
 #winMessage{font-size:24px;color:#58cc02;margin-top:20px;}
 #wordList li{margin:5px;padding:5px;background:white;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);display:flex;justify-content:space-between;align-items:center;}
 #wordList button{background:red;padding:2px 6px;border-radius:6px;}
@@ -32,7 +32,14 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 #lastSynced{font-size:14px;color:#555;margin:5px 0;}
 #wordBankTopControls{display:flex;justify-content:center;align-items:center;gap:5px;margin-bottom:5px;}
 
-/* Mobile Matching Game */
+@keyframes shake{
+  0%{transform: translateX(0);}
+  25%{transform: translateX(-5px);}
+  50%{transform: translateX(5px);}
+  75%{transform: translateX(-5px);}
+  100%{transform: translateX(0);}
+}
+
 @media (max-width: 600px){
   #matchingGame{flex-direction:column;}
   .col{width:90%; justify-content:space-around;}
@@ -47,7 +54,6 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 </head>
 <body>
 
-<!-- Menu -->
 <div id="menu" class="screen active">
 <h1>Study App v2</h1>
 <button onclick="showWordBank()">📚 Word Bank</button>
@@ -55,7 +61,6 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 <button onclick="startMatching()">🎮 Matching Game</button>
 </div>
 
-<!-- Word Bank -->
 <div id="wordBankScreen" class="screen">
 <h2>Word Bank</h2>
 <label><input type="checkbox" id="sheetToggle" onchange="toggleSheet()"> Use Google Sheets</label>
@@ -76,7 +81,6 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 <button onclick="backToMenu()">⬅ Back</button>
 </div>
 
-<!-- Flashcards -->
 <div id="flashcardsScreen" class="screen">
 <h2>Flashcards</h2>
 <div id="flashcard" class="card" onclick="flipFlashcard()">
@@ -87,7 +91,6 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 <button onclick="backToMenu()">⬅ Back</button>
 </div>
 
-<!-- Matching Game -->
 <div id="matchingScreen" class="screen">
 <h2>Matching Game</h2>
 <button id="startMatchBtn" onclick="initMatchGame()">Start Game</button>
@@ -103,7 +106,7 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 <canvas id="confetti"></canvas>
 
 <script>
-// Word Bank & Sheet integration
+// Word Bank
 let localWordBank = JSON.parse(localStorage.getItem("wordBank")) || [
   {spanish:"hola",english:"hello"},
   {spanish:"adiós",english:"goodbye"},
@@ -113,72 +116,51 @@ let localWordBank = JSON.parse(localStorage.getItem("wordBank")) || [
   {spanish:"buenos días",english:"good morning"}
 ];
 
-let flashIndex=0, isFlipped=false, selected=[], sheetEnabled=false;
+let flashIndex=0,isFlipped=false,selected=[],sheetEnabled=false;
 
-// UI
+// UI functions
 function hideAll(){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));}
 function backToMenu(){hideAll();document.getElementById("menu").classList.add("active");}
-function showWordBank(){hideAll();document.getElementById("wordBankScreen").classList.add("active"); if(sheetEnabled) fetchSheet(); else renderWordBank();}
-function startFlashcards(){hideAll();document.getElementById("flashcardsScreen").classList.add("active"); nextFlashcard();}
+function showWordBank(){hideAll();document.getElementById("wordBankScreen").classList.add("active");if(sheetEnabled) fetchSheet();}
+function startFlashcards(){hideAll();document.getElementById("flashcardsScreen").classList.add("active");nextFlashcard();}
 function startMatching(){hideAll();document.getElementById("matchingScreen").classList.add("active");}
 
 // Google Sheets
-function toggleSheet(){sheetEnabled=document.getElementById("sheetToggle").checked; if(sheetEnabled) fetchSheet();}
+function toggleSheet(){sheetEnabled=document.getElementById("sheetToggle").checked;if(sheetEnabled) fetchSheet();}
 function fetchSheet(){
-  const url = document.getElementById("sheetUrl").value.trim();
-  if(!url) return alert("Paste your Google Sheets CSV URL!");
-
-  fetch(url).then(res=>res.text()).then(csv=>{
-    const lines=csv.split("\n");
-    let newWords=[];
-    lines.forEach(l=>{
-      const [sp,en]=l.split(",");
-      if(sp && en) newWords.push({spanish: sp.trim(), english: en.trim()});
-    });
+  const url=document.getElementById("sheetUrl").value.trim();
+  if(!url)return alert("Paste your Google Sheets CSV URL!");
+  fetch(url).then(r=>r.text()).then(csv=>{
+    const lines=csv.split("\n"),newWords=[];
+    lines.forEach(l=>{const [sp,en]=l.split(",");if(sp&&en)newWords.push({spanish:sp.trim(),english:en.trim()});});
     if(newWords.length>0){
-      newWords.forEach(nw=>{
-        if(!localWordBank.some(w=>w.spanish===nw.spanish && w.english===nw.english)){
-          localWordBank.push(nw);
-        }
-      });
+      newWords.forEach(nw=>{if(!localWordBank.some(w=>w.spanish===nw.spanish&&w.english===nw.english))localWordBank.push(nw);});
       saveBank(); renderWordBank();
       document.getElementById("lastSynced").textContent=`✅ Synced online at ${new Date().toLocaleString()}`;
     }
-  }).catch(err=>{
-    document.getElementById("lastSynced").textContent="⚠️ Could not fetch sheet. Make sure it's public.";
-  });
+  }).catch(()=>{document.getElementById("lastSynced").textContent="⚠️ Could not fetch sheet. Make sure it's public."});
 }
 
 // Word Bank UI
 function renderWordBank(){
   const list=document.getElementById("wordList"); list.innerHTML="";
   localWordBank.forEach((w,i)=>{
-    const li=document.createElement("li");
-    li.textContent=`${w.spanish} – ${w.english}`;
-    const del=document.createElement("button");
-    del.textContent="❌";
+    const li=document.createElement("li"); li.textContent=`${w.spanish} – ${w.english}`;
+    const del=document.createElement("button"); del.textContent="❌";
     del.onclick=()=>{if(confirm("Delete this word?")){localWordBank.splice(i,1);saveBank();renderWordBank();}};
     li.appendChild(del); list.appendChild(li);
   });
 }
 
-function addWord(){
-  let sp=document.getElementById("spanishInput").value.trim();
-  let en=document.getElementById("englishInput").value.trim();
-  if(sp && en){ localWordBank.push({spanish:sp,english:en}); saveBank(); renderWordBank(); document.getElementById("spanishInput").value=""; document.getElementById("englishInput").value="";}
-}
-
+function addWord(){let sp=document.getElementById("spanishInput").value.trim(); let en=document.getElementById("englishInput").value.trim();
+if(sp&&en){localWordBank.push({spanish:sp,english:en});saveBank();renderWordBank();document.getElementById("spanishInput").value="";document.getElementById("englishInput").value="";}}
 function saveBank(){localStorage.setItem("wordBank",JSON.stringify(localWordBank));}
 
 // Flashcards
-function nextFlashcard(){
-  if(localWordBank.length===0) return;
-  flashIndex=Math.floor(Math.random()*localWordBank.length);
-  let card=document.getElementById("flashcard");
-  card.querySelector(".front").textContent=localWordBank[flashIndex].spanish;
-  card.querySelector(".back").textContent=localWordBank[flashIndex].english;
-  card.style.transform="rotateY(0)"; isFlipped=false;
-}
+function nextFlashcard(){if(localWordBank.length===0)return; flashIndex=Math.floor(Math.random()*localWordBank.length);
+let card=document.getElementById("flashcard"); card.querySelector(".front").textContent=localWordBank[flashIndex].spanish;
+card.querySelector(".back").textContent=localWordBank[flashIndex].english;
+card.style.transform="rotateY(0)"; isFlipped=false;}
 function flipFlashcard(){const card=document.getElementById("flashcard"); isFlipped=!isFlipped; card.style.transform=isFlipped?"rotateY(180deg)":"rotateY(0)";}
 
 // Matching Game
@@ -189,77 +171,54 @@ function initMatchGame(){
 }
 
 function newMatchRound(){
-  selected=[];
-  const spCol=document.getElementById("spanishCol");
-  const enCol=document.getElementById("englishCol");
-  spCol.innerHTML=""; enCol.innerHTML="";
-  document.getElementById("winMessage").classList.add("hidden");
-
-  let pool=[...localWordBank];
-  if(pool.length<5) pool=pool.concat(pool);
-  let chosen=[]; 
-  while(chosen.length<5 && pool.length>0){
-    let idx=Math.floor(Math.random()*pool.length);
-    chosen.push(pool.splice(idx,1)[0]);
-  }
-
+  selected=[]; 
+  const spCol=document.getElementById("spanishCol"); const enCol=document.getElementById("englishCol");
+  spCol.innerHTML=""; enCol.innerHTML=""; document.getElementById("winMessage").classList.add("hidden");
+  
+  let pool=[...localWordBank]; if(pool.length<5) pool=pool.concat(pool);
+  let chosen=[]; while(chosen.length<5 && pool.length>0){ let idx=Math.floor(Math.random()*pool.length); chosen.push(pool.splice(idx,1)[0]); }
+  
   chosen.forEach((w,i)=>{
-    let s=document.createElement("div");
-    s.className="word-card"; s.textContent=w.spanish; s.dataset.match=i; s.dataset.lang="sp";
-    s.onclick=()=>selectCard(s);
-    spCol.appendChild(s);
-
-    let e=document.createElement("div");
-    e.className="word-card"; e.textContent=w.english; e.dataset.match=i; e.dataset.lang="en";
-    e.onclick=()=>selectCard(e);
-    enCol.appendChild(e);
+    let s=document.createElement("div"); s.className="word-card"; s.textContent=w.spanish; s.dataset.match=i; s.dataset.lang="sp";
+    s.onclick=()=>selectCard(s); spCol.appendChild(s);
+    let e=document.createElement("div"); e.className="word-card"; e.textContent=w.english; e.dataset.match=i; e.dataset.lang="en";
+    e.onclick=()=>selectCard(e); enCol.appendChild(e);
   });
 
-  [spCol,enCol].forEach(col=>{
-    for(let i=col.children.length;i>=0;i--){col.appendChild(col.children[Math.random()*i|0]);}
-  });
+  [spCol,enCol].forEach(col=>{for(let i=col.children.length;i>=0;i--)col.appendChild(col.children[Math.random()*i|0]);});
 }
 
 function selectCard(card){
-  const sound = document.getElementById("matchSound");
+  const sound=document.getElementById("matchSound");
   if(card.classList.contains("matched")) return;
   if(selected.length===0){ selected.push(card); card.classList.add("selected"); }
   else if(selected.length===1){
     if(selected[0].dataset.lang===card.dataset.lang){ selected[0].classList.remove("selected"); selected=[card]; card.classList.add("selected"); return; }
     card.classList.add("selected"); selected.push(card);
     if(selected[0].dataset.match===selected[1].dataset.match){
-      selected.forEach(c=>{c.classList.remove("selected"); c.classList.add("matched");});
-      navigator.vibrate?.(200);
-      sound.play();
-      selected=[]; checkWin();
-    } else { selected.forEach(c=>c.classList.add("wrong")); setTimeout(()=>{selected.forEach(c=>c.classList.remove("wrong","selected")); selected=[];},400); }
+      selected.forEach(c=>{c.classList.remove("selected"); c.classList.add("matched"); c.classList.add("animate");});
+      navigator.vibrate?.(200); sound.play(); selected=[]; checkWin();
+    } else { selected.forEach(c=>c.classList.add("wrong")); setTimeout(()=>{selected.forEach(c=>c.classList.remove("wrong","selected")); selected=[];},400);}
   }
 }
 
 function checkWin(){
-  const all=document.querySelectorAll("#matchingGame .word-card");
-  const matched=document.querySelectorAll("#matchingGame .matched");
-  if(all.length===matched.length){
-    document.getElementById("winMessage").classList.remove("hidden"); 
-    launchConfetti();
-    setTimeout(()=>{ newMatchRound(); },1500);
-  }
+  const all=document.querySelectorAll("#matchingGame .word-card"); const matched=document.querySelectorAll("#matchingGame .matched");
+  if(all.length===matched.length){ document.getElementById("winMessage").classList.remove("hidden"); launchConfetti(); setTimeout(()=>{newMatchRound();},1500);}
 }
 
 // Confetti
 function launchConfetti(){
   const canvas=document.getElementById("confetti"); const ctx=canvas.getContext("2d");
   canvas.width=window.innerWidth; canvas.height=window.innerHeight;
-  let particles=[];
-  for(let i=0;i<100;i++){ particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,dx:(Math.random()-0.5)*2,dy:Math.random()*2+1,color:`hsl(${Math.random()*360},100%,50%)`}); }
-  let duration=1000,start=Date.now();
-  function animate(){ ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach(p=>{ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4); p.x+=p.dx; p.y+=p.dy;}); if(Date.now()-start<duration) requestAnimationFrame(animate); }
+  let particles=[]; for(let i=0;i<100;i++){ particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,dx:(Math.random()-0.5)*2,dy:Math.random()*2+1,color:`hsl(${Math.random()*360},100%,50%)`}); }
+  let start=Date.now(); function animate(){ ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach(p=>{ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4); p.x+=p.dx; p.y+=p.dy;}); if(Date.now()-start<1000) requestAnimationFrame(animate); }
   animate();
 }
 
 // Service Worker registration
 if("serviceWorker" in navigator){
-  window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(reg=>console.log("Service Worker registered",reg.scope)).catch(err=>console.log("SW registration failed",err));});
+  window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(reg=>console.log("SW registered",reg.scope)).catch(err=>console.log("SW failed",err));});
 }
 </script>
 </body>
