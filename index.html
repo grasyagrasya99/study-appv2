@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Duolingo-style Study App</title>
+<title>Study App v2</title>
 <meta name="theme-color" content="#4CAF50">
 <meta name="background-color" content="#ffffff">
 <style>
@@ -28,12 +28,13 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 #wordList button{background:red;padding:2px 6px;border-radius:6px;}
 #confetti{position:fixed;top:0;left:0;pointer-events:none;}
 .hidden{display:none;}
+#lastSynced{font-size:14px;color:#555;margin:5px 0;}
 </style>
 </head>
 <body>
 
 <div id="menu" class="screen active">
-<h1>Study App</h1>
+<h1>Study App v2</h1>
 <button onclick="showWordBank()">📚 Word Bank</button>
 <button onclick="startFlashcards()">🃏 Flashcards</button>
 <button onclick="startMatching()">🎮 Matching Game</button>
@@ -43,17 +44,14 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 <h2>Word Bank</h2>
 <label><input type="checkbox" id="sheetToggle" onchange="toggleSheet()"> Use Google Sheets</label>
 <input type="text" id="sheetUrl" placeholder="Paste your Sheet CSV URL"/>
-
-<!-- Top controls container with back button -->
-<div style="display:flex; gap:10px; justify-content:center; margin:10px 0;">
-  <input type="text" id="spanishInput" placeholder="Spanish"/>
-  <input type="text" id="englishInput" placeholder="English"/>
-  <button onclick="addWord()">Add</button>
-  <button onclick="backToMenu()">⬅ Back</button>
+<button onclick="fetchSheet()">🔄 Refresh from Sheet</button>
+<p id="lastSynced">Not synced yet</p>
+<div id="addWord">
+<input type="text" id="spanishInput" placeholder="Spanish"/>
+<input type="text" id="englishInput" placeholder="English"/>
+<button onclick="addWord()">Add</button>
 </div>
-
 <ul id="wordList"></ul>
-<!-- Keep bottom back button -->
 <button onclick="backToMenu()">⬅ Back</button>
 </div>
 
@@ -80,11 +78,6 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 
 <canvas id="confetti"></canvas>
 
-<!-- Add matching sound -->
-<audio id="matchSound">
-  <source src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" type="audio/ogg">
-</audio>
-
 <script>
 // Word Bank
 let localWordBank = JSON.parse(localStorage.getItem("wordBank")) || [
@@ -98,24 +91,78 @@ let localWordBank = JSON.parse(localStorage.getItem("wordBank")) || [
 
 let flashIndex=0, isFlipped=false, selected=[], sheetEnabled=false;
 
-// UI
+// UI functions
 function hideAll(){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));}
 function backToMenu(){hideAll();document.getElementById("menu").classList.add("active");}
-function showWordBank(){hideAll();document.getElementById("wordBankScreen").classList.add("active"); renderWordBank();}
+function showWordBank(){
+  hideAll();
+  document.getElementById("wordBankScreen").classList.add("active");
+  if(sheetEnabled) fetchSheet(); else renderWordBank();
+}
 function startFlashcards(){hideAll();document.getElementById("flashcardsScreen").classList.add("active"); nextFlashcard();}
 function startMatching(){hideAll();document.getElementById("matchingScreen").classList.add("active");}
 
 // Google Sheets
 function toggleSheet(){sheetEnabled=document.getElementById("sheetToggle").checked; if(sheetEnabled) fetchSheet();}
+
 function fetchSheet(){
-  const url=document.getElementById("sheetUrl").value.trim();
+  const url = document.getElementById("sheetUrl").value.trim();
   if(!url) return alert("Paste your Google Sheets CSV URL!");
-  fetch(url).then(res=>res.text()).then(csv=>{
-    const lines=csv.split("\n");
-    let newWords=[];
-    lines.forEach(l=>{const [sp,en]=l.split(","); if(sp && en) newWords.push({spanish:sp.trim(),english:en.trim()});});
-    if(newWords.length>0){localWordBank=newWords; saveBank(); renderWordBank(); alert("Words synced!");}
-  }).catch(err=>alert("Error fetching CSV"));
+
+  fetch(url)
+    .then(res => res.text())
+    .then(csv => {
+      if('caches' in window){
+        caches.open('study-app-v2-cache').then(cache => {
+          const response = new Response(csv, {headers: {'Content-Type': 'text/csv'}});
+          cache.put(url, response);
+        });
+      }
+      const lines = csv.split("\n");
+      let newWords = [];
+      lines.forEach(l => {
+        const [sp, en] = l.split(",");
+        if(sp && en) newWords.push({spanish: sp.trim(), english: en.trim()});
+      });
+      if(newWords.length > 0){
+        newWords.forEach(nw => {
+          if(!localWordBank.some(w => w.spanish === nw.spanish && w.english === nw.english)){
+            localWordBank.push(nw);
+          }
+        });
+        saveBank();
+        renderWordBank();
+        document.getElementById("lastSynced").textContent = `✅ Synced online at ${new Date().toLocaleString()}`;
+      }
+    })
+    .catch(err => {
+      if('caches' in window){
+        caches.match(url).then(response => {
+          if(!response){
+            document.getElementById("lastSynced").textContent = "⚠️ No cached CSV available offline.";
+            return;
+          }
+          response.text().then(csv => {
+            const lines = csv.split("\n");
+            let newWords = [];
+            lines.forEach(l => {
+              const [sp, en] = l.split(",");
+              if(sp && en) newWords.push({spanish: sp.trim(), english: en.trim()});
+            });
+            newWords.forEach(nw => {
+              if(!localWordBank.some(w => w.spanish === nw.spanish && w.english === nw.english)){
+                localWordBank.push(nw);
+              }
+            });
+            saveBank();
+            renderWordBank();
+            document.getElementById("lastSynced").textContent = `📴 Loaded cached words (offline)`;
+          });
+        });
+      } else {
+        document.getElementById("lastSynced").textContent = "❌ Error fetching CSV and no cache available.";
+      }
+    });
 }
 
 // Word Bank UI
@@ -130,13 +177,16 @@ function renderWordBank(){
     li.appendChild(del); list.appendChild(li);
   });
 }
+
 function addWord(){
   let sp=document.getElementById("spanishInput").value.trim();
   let en=document.getElementById("englishInput").value.trim();
-  if(sp && en){localWordBank.push({spanish:sp,english:en}); saveBank(); renderWordBank();
+  if(sp && en){
+    localWordBank.push({spanish:sp,english:en}); saveBank(); renderWordBank();
     document.getElementById("spanishInput").value=""; document.getElementById("englishInput").value="";
   }
 }
+
 function saveBank(){localStorage.setItem("wordBank",JSON.stringify(localWordBank));}
 
 // Flashcards
@@ -191,30 +241,15 @@ function newMatchRound(){
 
 function selectCard(card){
   if(card.classList.contains("matched")) return;
-
-  if(selected.length===0){
-    selected.push(card);
-    card.classList.add("selected");
-  } else if(selected.length===1){
-    if(selected[0].dataset.lang===card.dataset.lang){
-      selected[0].classList.remove("selected");
-      selected=[card]; card.classList.add("selected"); return;
-    }
-
+  if(selected.length===0){ selected.push(card); card.classList.add("selected"); }
+  else if(selected.length===1){
+    if(selected[0].dataset.lang===card.dataset.lang){ selected[0].classList.remove("selected"); selected=[card]; card.classList.add("selected"); return; }
     card.classList.add("selected"); selected.push(card);
-
     if(selected[0].dataset.match===selected[1].dataset.match){
       selected.forEach(c=>{c.classList.remove("selected"); c.classList.add("matched");});
-      // Play Doulingo match sound
-      document.getElementById("matchSound").currentTime = 0;
-      document.getElementById("matchSound").play();
       navigator.vibrate?.(200);
-      selected=[];
-      checkWin();
-    } else {
-      selected.forEach(c=>c.classList.add("wrong"));
-      setTimeout(()=>{selected.forEach(c=>c.classList.remove("wrong","selected")); selected=[];},400);
-    }
+      selected=[]; checkWin();
+    } else { selected.forEach(c=>c.classList.add("wrong")); setTimeout(()=>{selected.forEach(c=>c.classList.remove("wrong","selected")); selected=[];},400); }
   }
 }
 
@@ -233,27 +268,15 @@ function launchConfetti(){
   const canvas=document.getElementById("confetti"); const ctx=canvas.getContext("2d");
   canvas.width=window.innerWidth; canvas.height=window.innerHeight;
   let particles=[];
-  for(let i=0;i<100;i++){
-    particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,dx:(Math.random()-0.5)*2,dy:Math.random()*2+1,color:`hsl(${Math.random()*360},100%,50%)`});
-  }
+  for(let i=0;i<100;i++){ particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,dx:(Math.random()-0.5)*2,dy:Math.random()*2+1,color:`hsl(${Math.random()*360},100%,50%)`}); }
   let duration=1000,start=Date.now();
-  function animate(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    particles.forEach(p=>{ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4); p.x+=p.dx; p.y+=p.dy;});
-    if(Date.now()-start<duration) requestAnimationFrame(animate);
-  }
+  function animate(){ ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach(p=>{ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4); p.x+=p.dx; p.y+=p.dy;}); if(Date.now()-start<duration) requestAnimationFrame(animate); }
   animate();
 }
-</script>
 
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((registration) => { console.log("Service Worker registered:", registration.scope); })
-      .catch((error) => { console.log("Service Worker registration failed:", error); });
-  });
+// Service Worker registration
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(reg=>console.log("Service Worker registered",reg.scope)).catch(err=>console.log("SW registration failed",err));});
 }
 </script>
 </body>
