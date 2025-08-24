@@ -1,24 +1,22 @@
-const CACHE_NAME = "study-app-cache-v2";
+const CACHE_NAME = "study-app-cache-v3";
 const urlsToCache = [
   "/",
   "/index.html",
   "/manifest.json",
+  "/favicon.png",
   "/icon-192.png",
   "/icon-512.png",
-  "/favicon.png",
   "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"
 ];
 
-// Install the service worker
+// Install the service worker and cache files
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
   );
 });
 
-// Activate and clean old caches
+// Activate and remove old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) =>
@@ -31,7 +29,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Fetch cached content when offline
+// Serve cached content when offline
 self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => response || fetch(event.request))
