@@ -29,6 +29,7 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 #confetti{position:fixed;top:0;left:0;pointer-events:none;}
 .hidden{display:none;}
 #lastSynced{font-size:14px;color:#555;margin:5px 0;}
+#wordBankTopControls{display:flex;justify-content:center;align-items:center;gap:5px;margin-bottom:5px;}
 </style>
 </head>
 <body>
@@ -46,12 +47,19 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 <input type="text" id="sheetUrl" placeholder="Paste your Sheet CSV URL"/>
 <button onclick="fetchSheet()">🔄 Refresh from Sheet</button>
 <p id="lastSynced">Not synced yet</p>
-<div id="addWord">
-<input type="text" id="spanishInput" placeholder="Spanish"/>
-<input type="text" id="englishInput" placeholder="English"/>
-<button onclick="addWord()">Add</button>
+
+<!-- Top back button row -->
+<div id="wordBankTopControls">
+  <button onclick="backToMenu()">⬅ Back</button>
+  <div id="addWord">
+    <input type="text" id="spanishInput" placeholder="Spanish"/>
+    <input type="text" id="englishInput" placeholder="English"/>
+    <button onclick="addWord()">Add</button>
+  </div>
 </div>
+
 <ul id="wordList"></ul>
+<!-- Keep old bottom back button as well -->
 <button onclick="backToMenu()">⬅ Back</button>
 </div>
 
@@ -74,6 +82,7 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
 </div>
 <div id="winMessage" class="hidden">🎉 Well Done! 🎉</div>
 <button onclick="backToMenu()">⬅ Back</button>
+<audio id="matchSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
 </div>
 
 <canvas id="confetti"></canvas>
@@ -104,7 +113,6 @@ function startMatching(){hideAll();document.getElementById("matchingScreen").cla
 
 // Google Sheets
 function toggleSheet(){sheetEnabled=document.getElementById("sheetToggle").checked; if(sheetEnabled) fetchSheet();}
-
 function fetchSheet(){
   const url = document.getElementById("sheetUrl").value.trim();
   if(!url) return alert("Paste your Google Sheets CSV URL!");
@@ -112,6 +120,7 @@ function fetchSheet(){
   fetch(url)
     .then(res => res.text())
     .then(csv => {
+      // Cache CSV for offline
       if('caches' in window){
         caches.open('study-app-v2-cache').then(cache => {
           const response = new Response(csv, {headers: {'Content-Type': 'text/csv'}});
@@ -240,6 +249,7 @@ function newMatchRound(){
 }
 
 function selectCard(card){
+  const sound = document.getElementById("matchSound");
   if(card.classList.contains("matched")) return;
   if(selected.length===0){ selected.push(card); card.classList.add("selected"); }
   else if(selected.length===1){
@@ -248,6 +258,7 @@ function selectCard(card){
     if(selected[0].dataset.match===selected[1].dataset.match){
       selected.forEach(c=>{c.classList.remove("selected"); c.classList.add("matched");});
       navigator.vibrate?.(200);
+      sound.play(); // Play match sound
       selected=[]; checkWin();
     } else { selected.forEach(c=>c.classList.add("wrong")); setTimeout(()=>{selected.forEach(c=>c.classList.remove("wrong","selected")); selected=[];},400); }
   }
