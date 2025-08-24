@@ -1,6 +1,4 @@
-// sw.js - Service Worker
-
-const CACHE_NAME = "study-app-cache-v1";
+const CACHE_NAME = "study-app-cache-v2";
 const urlsToCache = [
   "/",
   "/index.html",
@@ -8,7 +6,7 @@ const urlsToCache = [
   "/icon-192.png",
   "/icon-512.png",
   "/favicon.png",
-  "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" // match sound
+  "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"
 ];
 
 // Install the service worker
@@ -26,9 +24,7 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((cacheNames) =>
       Promise.all(
         cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
+          if (cache !== CACHE_NAME) return caches.delete(cache);
         })
       )
     )
@@ -38,8 +34,6 @@ self.addEventListener("activate", (event) => {
 // Fetch cached content when offline
 self.addEventListener("fetch", (event) => {
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
+    caches.match(event.request).then((response) => response || fetch(event.request))
   );
 });
