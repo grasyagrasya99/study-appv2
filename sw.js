@@ -1,11 +1,13 @@
-const CACHE_NAME = "study-app-cache-v3";
+const CACHE_NAME = "study-app-cache-v4";
 const urlsToCache = [
-  "/",
-  "/index.html",
-  "/manifest.json",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/favicon.png",
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./favicon.png",
+  "./success.mp3",
+  "./complete.mp3",
   "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"
 ];
 
@@ -37,12 +39,17 @@ self.addEventListener("fetch", (event) => {
   if (requestUrl.origin.includes("docs.google.com") && requestUrl.pathname.includes("/pub")) {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
-        return cachedResponse || fetch(event.request).then((response) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, response.clone());
-            return response;
-          });
-        }).catch(() => cachedResponse || new Response("", {status: 503, statusText: "Offline"}));
+        return (
+          cachedResponse ||
+          fetch(event.request)
+            .then((response) => {
+              return caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, response.clone());
+                return response;
+              });
+            })
+            .catch(() => cachedResponse || new Response("", { status: 503, statusText: "Offline" }))
+        );
       })
     );
     return;
