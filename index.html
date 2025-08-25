@@ -40,15 +40,28 @@ button{margin:5px;padding:10px 15px;border-radius:12px;border:none;background:#5
   100%{transform: translateX(0);}
 }
 
-@media (max-width: 600px){
-  #matchingGame{flex-direction:column;}
-  .col{width:90%; justify-content:space-around;}
-  .word-card{width:45%; margin:5px; font-size:20px; height:60px;}
+/* ✅ Matching game fix */
+#matchingGame {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
-@media (min-width: 601px){
-  #matchingGame{flex-direction:row;}
-  .col{width:45%;}
-  .word-card{width:80%; font-size:18px;}
+
+.col {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.word-card {
+  width: 100%;
+  max-width: 140px;
+  height: 55px;
+  font-size: 16px;
 }
 </style>
 </head>
@@ -218,7 +231,7 @@ function launchConfetti(){
 
 // Service Worker registration
 if("serviceWorker" in navigator){
-  window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").then(reg=>console.log("SW registered",reg.scope)).catch(err=>console.log("SW failed",err));});
+  window.addEventListener("load",()=>{navigator.serviceWorker.register("./sw.js").then(reg=>console.log("SW registered",reg.scope)).catch(err=>console.log("SW failed",err));});
 }
 </script>
 </body>
